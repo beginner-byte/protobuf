@@ -1,9 +1,32 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
 //
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file or at
-// https://developers.google.com/open-source/licenses/bsd
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.google.protobuf;
 
@@ -477,8 +500,7 @@ final class RopeByteString extends ByteString {
   // equals() and hashCode()
 
   @Override
-  public boolean equals(
-          Object other) {
+  public boolean equals(Object other) {
     if (other == this) {
       return true;
     }
@@ -581,12 +603,7 @@ final class RopeByteString extends ByteString {
 
   @Override
   public CodedInputStream newCodedInput() {
-    // Passing along direct references to internal ByteBuffers can support more efficient parsing
-    // via aliasing in CodedInputStream for users who wish to use it.
-    //
-    // Otherwise we force data copies, both in copying as an input stream and in buffering in the
-    // CodedInputSteam.
-    return CodedInputStream.newInstance(asReadOnlyByteBufferList(), /* bufferIsImmutable= */ true);
+    return CodedInputStream.newInstance(new RopeInputStream());
   }
 
   @Override
@@ -828,10 +845,7 @@ final class RopeByteString extends ByteString {
         throw new IndexOutOfBoundsException();
       }
       int bytesRead = readSkipInternal(b, offset, length);
-      if (bytesRead == 0 && (length > 0 || availableInternal() == 0)) {
-        // Modeling ByteArrayInputStream.read(byte[], int, int) behavior noted above:
-        // It's ok to read 0 bytes on purpose (length == 0) from a stream that isn't at EOF.
-        // It's not ok to try to read bytes (even 0 bytes) from a stream that is at EOF.
+      if (bytesRead == 0) {
         return -1;
       } else {
         return bytesRead;
@@ -891,7 +905,8 @@ final class RopeByteString extends ByteString {
 
     @Override
     public int available() throws IOException {
-      return availableInternal();
+      int bytesRead = currentPieceOffsetInRope + currentPieceIndex;
+      return RopeByteString.this.size() - bytesRead;
     }
 
     @Override
@@ -939,12 +954,6 @@ final class RopeByteString extends ByteString {
           currentPieceSize = 0;
         }
       }
-    }
-
-    /** Computes the number of bytes still available to read. */
-    private int availableInternal() {
-      int bytesRead = currentPieceOffsetInRope + currentPieceIndex;
-      return RopeByteString.this.size() - bytesRead;
     }
   }
 }

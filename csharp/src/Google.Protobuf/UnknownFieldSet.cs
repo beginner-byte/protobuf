@@ -1,17 +1,39 @@
 #region Copyright notice and license
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
 //
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file or at
-// https://developers.google.com/open-source/licenses/bsd
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Security;
+using System.IO;
+using Google.Protobuf.Reflection;
 
 namespace Google.Protobuf
 {
@@ -24,17 +46,16 @@ namespace Google.Protobuf
     ///
     /// Most users will never need to use this class directly.
     /// </summary>
-    [DebuggerDisplay("Count = {fields.Count}")]
-    [DebuggerTypeProxy(typeof(UnknownFieldSetDebugView))]
     public sealed partial class UnknownFieldSet
     {
-        private readonly IDictionary<int, UnknownField> fields = new Dictionary<int, UnknownField>();
+        private readonly IDictionary<int, UnknownField> fields;
 
         /// <summary>
         /// Creates a new UnknownFieldSet.
         /// </summary>
         internal UnknownFieldSet()
         {
+            this.fields = new Dictionary<int, UnknownField>();
         }
 
         /// <summary>
@@ -50,26 +71,9 @@ namespace Google.Protobuf
         /// </summary>
         public void WriteTo(CodedOutputStream output)
         {
-            WriteContext.Initialize(output, out WriteContext ctx);
-            try
-            {
-                WriteTo(ref ctx);
-            }
-            finally
-            {
-                ctx.CopyStateTo(output);
-            }
-        }
-
-        /// <summary>
-        /// Serializes the set and writes it to <paramref name="ctx"/>.
-        /// </summary>
-        [SecuritySafeCritical]
-        public void WriteTo(ref WriteContext ctx)
-        {
             foreach (KeyValuePair<int, UnknownField> entry in fields)
             {
-                entry.Value.WriteTo(entry.Key, ref ctx);
+                entry.Value.WriteTo(entry.Key, output);
             }
         }
 
@@ -97,13 +101,14 @@ namespace Google.Protobuf
             }
             UnknownFieldSet otherSet = other as UnknownFieldSet;
             IDictionary<int, UnknownField> otherFields = otherSet.fields;
-            if (fields.Count != otherFields.Count)
+            if (fields.Count  != otherFields.Count)
             {
                 return false;
             }
             foreach (KeyValuePair<int, UnknownField> leftEntry in fields)
             {
-                if (!otherFields.TryGetValue(leftEntry.Key, out UnknownField rightValue))
+                UnknownField rightValue;
+                if (!otherFields.TryGetValue(leftEntry.Key, out rightValue))
                 {
                     return false;
                 }
@@ -147,7 +152,8 @@ namespace Google.Protobuf
                 return null;
             }
 
-            if (fields.TryGetValue(number, out UnknownField existing))
+            UnknownField existing;
+            if (fields.TryGetValue(number, out existing))
             {
                 return existing;
             }
@@ -170,47 +176,47 @@ namespace Google.Protobuf
             fields[number] = field;
             return this;
         }
-        
+
         /// <summary>
-        /// Parse a single field from <paramref name="ctx"/> and merge it
+        /// Parse a single field from <paramref name="input"/> and merge it
         /// into this set.
         /// </summary>
-        /// <param name="ctx">The parse context from which to read the field</param>
+        /// <param name="input">The coded input stream containing the field</param>
         /// <returns>false if the tag is an "end group" tag, true otherwise</returns>
-        private bool MergeFieldFrom(ref ParseContext ctx)
+        private bool MergeFieldFrom(CodedInputStream input)
         {
-            uint tag = ctx.LastTag;
+            uint tag = input.LastTag;
             int number = WireFormat.GetTagFieldNumber(tag);
             switch (WireFormat.GetTagWireType(tag))
             {
                 case WireFormat.WireType.Varint:
                     {
-                        ulong uint64 = ctx.ReadUInt64();
+                        ulong uint64 = input.ReadUInt64();
                         GetOrAddField(number).AddVarint(uint64);
                         return true;
                     }
                 case WireFormat.WireType.Fixed32:
                     {
-                        uint uint32 = ctx.ReadFixed32();
+                        uint uint32 = input.ReadFixed32();
                         GetOrAddField(number).AddFixed32(uint32);
                         return true;
                     }
                 case WireFormat.WireType.Fixed64:
                     {
-                        ulong uint64 = ctx.ReadFixed64();
+                        ulong uint64 = input.ReadFixed64();
                         GetOrAddField(number).AddFixed64(uint64);
                         return true;
                     }
                 case WireFormat.WireType.LengthDelimited:
                     {
-                        ByteString bytes = ctx.ReadBytes();
+                        ByteString bytes = input.ReadBytes();
                         GetOrAddField(number).AddLengthDelimited(bytes);
                         return true;
                     }
                 case WireFormat.WireType.StartGroup:
                     {
                         UnknownFieldSet set = new UnknownFieldSet();
-                        ParsingPrimitivesMessages.ReadGroup(ref ctx, number, set);
+                        input.ReadGroup(number, set);
                         GetOrAddField(number).AddGroup(set);
                         return true;
                     }
@@ -223,16 +229,16 @@ namespace Google.Protobuf
             }
         }
 
-        internal void MergeGroupFrom(ref ParseContext ctx)
+        internal void MergeGroupFrom(CodedInputStream input)
         {
             while (true)
             {
-                uint tag = ctx.ReadTag();
+                uint tag = input.ReadTag();
                 if (tag == 0)
                 {
                     break;
                 }
-                if (!MergeFieldFrom(ref ctx))
+                if (!MergeFieldFrom(input))
                 {
                     break;
                 }
@@ -251,40 +257,16 @@ namespace Google.Protobuf
         public static UnknownFieldSet MergeFieldFrom(UnknownFieldSet unknownFields,
                                                      CodedInputStream input)
         {
-            ParseContext.Initialize(input, out ParseContext ctx);
-            try
+            if (input.DiscardUnknownFields)
             {
-                return MergeFieldFrom(unknownFields, ref ctx);
-            }
-            finally
-            {
-                ctx.CopyStateTo(input);
-            }
-        }
-
-        /// <summary>
-        /// Create a new UnknownFieldSet if unknownFields is null.
-        /// Parse a single field from <paramref name="ctx"/> and merge it
-        /// into unknownFields. If <paramref name="ctx"/> is configured to discard unknown fields,
-        /// <paramref name="unknownFields"/> will be returned as-is and the field will be skipped.
-        /// </summary>
-        /// <param name="unknownFields">The UnknownFieldSet which need to be merged</param>
-        /// <param name="ctx">The parse context from which to read the field</param>
-        /// <returns>The merged UnknownFieldSet</returns>
-        [SecuritySafeCritical]
-        public static UnknownFieldSet MergeFieldFrom(UnknownFieldSet unknownFields,
-                                                     ref ParseContext ctx)
-        {
-            if (ctx.DiscardUnknownFields)
-            {
-                ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
+                input.SkipLastField();
                 return unknownFields;
             }
             if (unknownFields == null)
             {
                 unknownFields = new UnknownFieldSet();
             }
-            if (!unknownFields.MergeFieldFrom(ref ctx))
+            if (!unknownFields.MergeFieldFrom(input))
             {
                 throw new InvalidProtocolBufferException("Merge an unknown field of end-group tag, indicating that the corresponding start-group was missing."); // match the old code-gen
             }
@@ -363,19 +345,6 @@ namespace Google.Protobuf
             UnknownFieldSet unknownFields = new UnknownFieldSet();
             unknownFields.MergeFrom(other);
             return unknownFields;
-        }
-
-        private sealed class UnknownFieldSetDebugView
-        {
-            private readonly UnknownFieldSet set;
-
-            public UnknownFieldSetDebugView(UnknownFieldSet set)
-            {
-                this.set = set;
-            }
-
-            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-            public KeyValuePair<int, UnknownField>[] Items => set.fields.ToArray();
         }
     }
 }

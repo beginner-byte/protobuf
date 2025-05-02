@@ -1,10 +1,33 @@
 ﻿#region Copyright notice and license
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
 //
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file or at
-// https://developers.google.com/open-source/licenses/bsd
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
 using System;
@@ -48,42 +71,18 @@ namespace Google.Protobuf.WellKnownTypes
                 Uint64Field = 4
             };
 
-            MessageParsingHelpers.AssertWritingMessage(message);
+            var bytes = message.ToByteArray();
+            var parsed = TestWellKnownTypes.Parser.ParseFrom(bytes);
 
-            MessageParsingHelpers.AssertRoundtrip(TestWellKnownTypes.Parser, message, parsed =>
-            {
-                Assert.AreEqual("x", parsed.StringField);
-                Assert.AreEqual(ByteString.CopyFrom(1, 2, 3), parsed.BytesField);
-                Assert.AreEqual(true, parsed.BoolField);
-                Assert.AreEqual(12.5f, parsed.FloatField);
-                Assert.AreEqual(12.25d, parsed.DoubleField);
-                Assert.AreEqual(1, parsed.Int32Field);
-                Assert.AreEqual(2L, parsed.Int64Field);
-                Assert.AreEqual(3U, parsed.Uint32Field);
-                Assert.AreEqual(4UL, parsed.Uint64Field);
-            });
-        }
-
-        [Test]
-        public void NegativeSingleValues()
-        {
-            var message = new TestWellKnownTypes
-            {
-                FloatField = -12.5f,
-                DoubleField = -12.25d,
-                Int32Field = -1,
-                Int64Field = -2
-            };
-
-            MessageParsingHelpers.AssertWritingMessage(message);
-
-            MessageParsingHelpers.AssertRoundtrip(TestWellKnownTypes.Parser, message, parsed =>
-            {
-                Assert.AreEqual(-12.5f, parsed.FloatField);
-                Assert.AreEqual(-12.25d, parsed.DoubleField);
-                Assert.AreEqual(-1, parsed.Int32Field);
-                Assert.AreEqual(-2L, parsed.Int64Field);
-            });
+            Assert.AreEqual("x", parsed.StringField);
+            Assert.AreEqual(ByteString.CopyFrom(1, 2, 3), parsed.BytesField);
+            Assert.AreEqual(true, parsed.BoolField);
+            Assert.AreEqual(12.5f, parsed.FloatField);
+            Assert.AreEqual(12.25d, parsed.DoubleField);
+            Assert.AreEqual(1, parsed.Int32Field);
+            Assert.AreEqual(2L, parsed.Int64Field);
+            Assert.AreEqual(3U, parsed.Uint32Field);
+            Assert.AreEqual(4UL, parsed.Uint64Field);
         }
 
         [Test]
@@ -102,20 +101,18 @@ namespace Google.Protobuf.WellKnownTypes
                 Uint64Field = 0
             };
 
-            MessageParsingHelpers.AssertWritingMessage(message);
+            var bytes = message.ToByteArray();
+            var parsed = TestWellKnownTypes.Parser.ParseFrom(bytes);
 
-            MessageParsingHelpers.AssertRoundtrip(TestWellKnownTypes.Parser, message, parsed =>
-            {
-                Assert.AreEqual("", parsed.StringField);
-                Assert.AreEqual(ByteString.Empty, parsed.BytesField);
-                Assert.AreEqual(false, parsed.BoolField);
-                Assert.AreEqual(0f, parsed.FloatField);
-                Assert.AreEqual(0d, parsed.DoubleField);
-                Assert.AreEqual(0, parsed.Int32Field);
-                Assert.AreEqual(0L, parsed.Int64Field);
-                Assert.AreEqual(0U, parsed.Uint32Field);
-                Assert.AreEqual(0UL, parsed.Uint64Field);
-            });
+            Assert.AreEqual("", parsed.StringField);
+            Assert.AreEqual(ByteString.Empty, parsed.BytesField);
+            Assert.AreEqual(false, parsed.BoolField);
+            Assert.AreEqual(0f, parsed.FloatField);
+            Assert.AreEqual(0d, parsed.DoubleField);
+            Assert.AreEqual(0, parsed.Int32Field);
+            Assert.AreEqual(0L, parsed.Int64Field);
+            Assert.AreEqual(0U, parsed.Uint32Field);
+            Assert.AreEqual(0UL, parsed.Uint64Field);
         }
 
         [Test]
@@ -143,13 +140,12 @@ namespace Google.Protobuf.WellKnownTypes
                 Uint32Field = { uint.MaxValue, uint.MinValue, 0U },
                 Uint64Field = { ulong.MaxValue, ulong.MinValue, 0UL },
             };
+            var bytes = message.ToByteArray();
+            var parsed = RepeatedWellKnownTypes.Parser.ParseFrom(bytes);
 
+            Assert.AreEqual(message, parsed);
             // Just to test a single value for sanity...
             Assert.AreEqual("Second", message.StringField[1]);
-
-            MessageParsingHelpers.AssertWritingMessage(message);
-
-            MessageParsingHelpers.AssertRoundtrip(RepeatedWellKnownTypes.Parser, message);
         }
 
         [Test]
@@ -174,8 +170,6 @@ namespace Google.Protobuf.WellKnownTypes
             var message = new RepeatedWellKnownTypes { Int32Field = { 5, 0 } };
             var actualBytes = message.ToByteArray();
             Assert.AreEqual(expectedBytes, actualBytes);
-
-            MessageParsingHelpers.AssertWritingMessage(message);
         }
 
         [Test]
@@ -200,12 +194,12 @@ namespace Google.Protobuf.WellKnownTypes
                 Uint64Field = { { 18, ulong.MaxValue }, { 19, ulong.MinValue }, { 20, 0UL } },
             };
 
+            var bytes = message.ToByteArray();
+            var parsed = MapWellKnownTypes.Parser.ParseFrom(bytes);
+
+            Assert.AreEqual(message, parsed);
             // Just to test a single value for sanity...
             Assert.AreEqual("Second", message.StringField[12]);
-
-            MessageParsingHelpers.AssertWritingMessage(message);
-
-            MessageParsingHelpers.AssertRoundtrip(MapWellKnownTypes.Parser, message);
         }
 
         [Test]
@@ -294,10 +288,10 @@ namespace Google.Protobuf.WellKnownTypes
         private void AssertOneofRoundTrip(OneofWellKnownTypes message)
         {
             // Normal roundtrip, but explicitly checking the case...
-            MessageParsingHelpers.AssertRoundtrip(OneofWellKnownTypes.Parser, message, parsed =>
-            {
-                Assert.AreEqual(message.OneofFieldCase, parsed.OneofFieldCase);
-            });
+            var bytes = message.ToByteArray();
+            var parsed = OneofWellKnownTypes.Parser.ParseFrom(bytes);
+            Assert.AreEqual(message, parsed);
+            Assert.AreEqual(message.OneofFieldCase, parsed.OneofFieldCase);
         }
 
         [Test]
@@ -412,10 +406,8 @@ namespace Google.Protobuf.WellKnownTypes
             Assert.AreEqual(8, stream.Length); // tag (1 byte) + length (1 byte) + message (6 bytes)
             stream.Position = 0;
 
-            MessageParsingHelpers.AssertReadingMessage(
-                TestWellKnownTypes.Parser,
-                stream.ToArray(),
-                message => Assert.AreEqual(65536, message.Int32Field));
+            var message = TestWellKnownTypes.Parser.ParseFrom(stream);
+            Assert.AreEqual(65536, message.Int32Field);
         }
 
         [Test]
@@ -439,10 +431,8 @@ namespace Google.Protobuf.WellKnownTypes
             Assert.Less(stream.Length, 8); // tag (1 byte) + length (1 byte) + message
             stream.Position = 0;
 
-            MessageParsingHelpers.AssertReadingMessage(
-                TestWellKnownTypes.Parser,
-                stream.ToArray(),
-                message => Assert.AreEqual(6, message.Int32Field));
+            var message = TestWellKnownTypes.Parser.ParseFrom(stream);
+            Assert.AreEqual(6, message.Int32Field);
         }
 
         [Test]
@@ -466,10 +456,8 @@ namespace Google.Protobuf.WellKnownTypes
             Assert.AreEqual(13, stream.Length); // tag (1 byte) + length (1 byte) + message (11 bytes)
             stream.Position = 0;
 
-            MessageParsingHelpers.AssertReadingMessage(
-                TestWellKnownTypes.Parser,
-                stream.ToArray(),
-                message => Assert.AreEqual(0xfffffffffffffL, message.Int64Field));
+            var message = TestWellKnownTypes.Parser.ParseFrom(stream);
+            Assert.AreEqual(0xfffffffffffffL, message.Int64Field);
         }
 
         [Test]
@@ -493,10 +481,8 @@ namespace Google.Protobuf.WellKnownTypes
             Assert.Less(stream.Length, 12); // tag (1 byte) + length (1 byte) + message
             stream.Position = 0;
 
-            MessageParsingHelpers.AssertReadingMessage(
-                TestWellKnownTypes.Parser,
-                stream.ToArray(),
-                message => Assert.AreEqual(6L, message.Int64Field));
+            var message = TestWellKnownTypes.Parser.ParseFrom(stream);
+            Assert.AreEqual(6L, message.Int64Field);
         }
 
         [Test]
